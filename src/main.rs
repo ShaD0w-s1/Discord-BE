@@ -1,38 +1,74 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, string};
 
 use axum::{
-    http::{HeaderValue,Method},
+    http::{HeaderValue, Method},
     response::Html,
     routing::{get, post},
     Json, Router,
 };
-use tower_http::cors::CorsLayer;
+use jsonwebtoken::{decode, encode};
+use serde::{Deserialize, Serialize};
+use tower_http::cors::{Any, CorsLayer};
+
+const SECRET_KEY: &[u8] = b"secret";
+
+
+
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new()
-        .layer(layer_cors())
-        .route("/", get(handler))
-        .route("/api/v1/login", post(loginHandler));
 
+    let cors = CorsLayer::permissive();
+
+    let api_nest = Router::new().route("/login", post(login_handler));
+
+    let app = Router::new()
+    .route("/", get(index_handler))
+    .nest("/api/v1", api_nest)
+    .layer(cors)
+    .into_make_service();
     let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
     println!("Listening on http://{}", addr);
-    let server = axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    axum::Server::bind(&addr).serve(app).await.unwrap();
 }
 
-fn layer_cors() -> CorsLayer{
-    CorsLayer::new()
-        .allow_origin("http://localhost:3000".parse::<HeaderValue>().unwrap())
-        .allow_methods([Method::GET])
-}
 
-async fn handler() -> Html<&'static str> {
+
+async fn index_handler() -> Html<&'static str> {
     Html("<h1>Hello, World!</h1>")
 }
+#[derive(Debug,Serialize, Deserialize)]
+struct LoginRequest {
+    username: String,
+    password: String,
+}
+#[derive(Debug,Serialize, Deserialize)]
+struct LoginResponse {
+    access_token: String,
+    refresh_token: String,
+}
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    sub: String,
+    iss: String,
+    exp: i64,
+    aud: String,
+}
 
-async fn loginHandler() -> Json<&'static str> {
-    Json("<h1>Hello, World!</h1>")
+async fn login_handler(Json(login_data): Json<LoginRequest>) -> Json<LoginResponse> {
+    let header = jsonwebtoken::Header::default();
+    let claims = Claims {
+        sub: login_data.username,
+        iss: "localhost".to_string(),
+        exp: 15_876_543_200,
+        aud: "localhost".to_string(),
+    };
+
+    let key = jsonwebtoken::EncodingKey::from_secret(SECRET_KEY);
+    let access_token = encode(&header, &claims, &key).unwrap();
+    let refresh_token = encode(&header, &claims, &key).unwrap();
+    Json(LoginResponse {
+        access_token,
+        refresh_token,
+    })
 }
