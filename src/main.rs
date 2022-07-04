@@ -1,39 +1,60 @@
-use std::{net::SocketAddr, io::{self, Read}};
+/*
+ * @Author: zhangyuxuan
+ * @Date: 2022-06-03 20:45:34
+ * @LastEditTime: 2022-07-04 22:58:26
+ * @LastEditors: zhangyuxuan
+ * @FilePath: \Discord-BE\src\main.rs
+ */
 use axum::{
+    extract::Extension,
     response::Html,
     routing::{get, post},
     Json, Router,
 };
-use jsonwebtoken::{ encode };
+
+use migration::{Migrator, MigrationTrait, MigratorTrait};
+
+use jsonwebtoken::encode;
+use sea_orm::{ConnectionTrait, Database, DatabaseConnection, Schema, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
-use tower_http::cors::{CorsLayer};
-
-#[derive(Debug, Clone, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "categoies")]
-pub struct Model {
-    #[sea_orm(primary_key)]
-    #[serde(skip_deserializing)]
-    pub id: i32,
-    pub name: String,
-    pub is_del: bool,
-}
-
-
+use std::net::SocketAddr;
+use tower_http::cors::CorsLayer;
 
 const SECRET_KEY: &[u8] = b"secret";
 
+async fn database() -> Result<DatabaseConnection, sea_orm::DbErr> {
+    let db: DatabaseConnection =
+        Database::connect("PostgreSQL://postgres:zzs852329@192.168.1.5/postgres").await?;
+    Ok(db)
+}
+
+use sea_orm::tests_cfg::*;
+
+
+fn tracing() {
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .with_test_writer()
+        .init();
+}
+
 #[tokio::main]
 async fn main() {
-    let cfg = intialize_dbconfig();
-    let client = get_client(cfg).await.unwrap();
+    tracing();
+    
+    let connect = Database::connect("PostgreSQL://postgres:zzs852329@192.168.1.5/postgres").await.unwrap();
 
-    find_by_username(client).await.unwrap();
+    Migrator::up(&connect, None);
 
+    let builder = connect.get_database_backend();
+    let schema = Schema::new(builder);
+
+    builder.build(&schema.create_table_from_entity(CakeFillingPrice));
+
+    
 
     let cors = CorsLayer::permissive();
-
     let api_nest = Router::new().route("/login", post(login_handler));
-
     let app = Router::new()
         .route("/", get(index_handler))
         .nest("/api/v1", api_nest)
@@ -65,20 +86,40 @@ struct Claims {
     aud: String,
 }
 
-async fn login_handler(Json(login_data): Json<LoginRequest>) -> Json<LoginResponse> {
-    let header = jsonwebtoken::Header::default();
-    let claims = Claims {
-        sub: login_data.username,
-        iss: "localhost".to_string(),
-        exp: 15_876_543_200,
-        aud: "localhost".to_string(),
-    };
 
-    let key = jsonwebtoken::EncodingKey::from_secret(SECRET_KEY);
-    let access_token = encode(&header, &claims, &key).unwrap();
-    let refresh_token = encode(&header, &claims, &key).unwrap();
-    Json(LoginResponse {
-        access_token,
-        refresh_token,
-    })
+// Json<LoginResponse>
+async fn login_handler(
+    Json(login_data): Json<LoginRequest>,
+    Extension(db): Extension<DatabaseConnection>,
+) -> () {
+
+    let name = entity::user::Entity::find()
+        .filter(entity::user::Column::Name);
+
+    match name {
+        Some(name) => {
+            println!("{:?}", name);
+        }
+        None => {
+            println!("None");
+        }
+    }
+        
+  
+
+    
+    // let header = jsonwebtoken::Header::default();
+    // let claims = Claims {
+    //     sub: login_data.username,
+    //     iss: "localhost".to_string(),
+    //     exp: 15_876_543_200,
+    //     aud: "localhost".to_string(),
+    // };
+    // let key = jsonwebtoken::EncodingKey::from_secret(SECRET_KEY);
+    // let access_token = encode(&header, &claims, &key).unwrap();
+    // let refresh_token = encode(&header, &claims, &key).unwrap();
+    // Json(LoginResponse {
+    //     access_token,
+    //     refresh_token,
+    // })
 }
