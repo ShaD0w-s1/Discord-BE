@@ -1,7 +1,7 @@
 /*
  * @Author: zhangyuxuan
  * @Date: 2022-07-04 17:10:11
- * @LastEditTime: 2022-07-04 18:05:46
+ * @LastEditTime: 2022-07-06 16:29:49
  * @LastEditors: zhangyuxuan
  * @FilePath: \Discord-BE\migration\src\m20220101_000001_create_table.rs
  */
