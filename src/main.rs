@@ -1,16 +1,16 @@
 /*
  * @Author: zhangyuxuan
  * @Date: 2022-06-03 20:45:34
- * @LastEditTime: 2022-07-07 02:01:45
+ * @LastEditTime: 2022-07-09 21:04:04
  * @LastEditors: zhangyuxuan
  * @FilePath: \Discord-BE\src\main.rs
  */
 
 
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr};
 
-use axum::{Server, Router, extract::Extension, response::Html, routing::get};
+use axum::{Server, Router, extract::Extension, routing::get};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{Database, DatabaseConnection};
 use tower_http::cors::CorsLayer;
@@ -34,9 +34,10 @@ fn tracing() {
 
 #[tokio::main]
 async fn main() {
+
     tracing();
 
-    let db_connect = Database::connect("PostgreSQL://postgres:zzs852329@192.168.1.5/postgres")
+    let db_connect = Database::connect("PostgreSQL://postgres:zzs852329@localhost/postgres")
         .await
         .expect("数据库连接失败");
 
@@ -45,8 +46,8 @@ async fn main() {
     let app = Router::new()
         .route("/", get(index_handle))
         .nest("/api",  api_router())
-        .layer(CorsLayer::permissive())
         .layer(Extension(db_connect))
+        .layer(CorsLayer::permissive())
         .into_make_service();
 
     //  数据库迁移
